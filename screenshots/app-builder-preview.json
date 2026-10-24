@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Dugout",
+      "hasCanvas": false,
+      "bodyTextLen": 170,
+      "bodyTextHash": "12d76980921d9ff6ae0fa44eb3e1cbdc4526b34db38ad9a66efba0a0230f6874",
+      "bodyTextPrefix": "DUGOUT Your lineup, saved Sign in with Google to keep this team’",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Dugout",
+      "hasCanvas": false,
+      "bodyTextLen": 170,
+      "bodyTextHash": "12d76980921d9ff6ae0fa44eb3e1cbdc4526b34db38ad9a66efba0a0230f6874",
+      "bodyTextPrefix": "DUGOUT Your lineup, saved Sign in with Google to keep this team’",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}

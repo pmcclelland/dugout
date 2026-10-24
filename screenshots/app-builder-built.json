@@ -1,0 +1,41 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Dugout",
+      "hasCanvas": false,
+      "bodyTextLen": 184,
+      "bodyTextHash": "6107eca7077f14900a87643ab17e6c4235cbba19cb9a9107e22f75455266c53e",
+      "bodyTextPrefix": "DUGOUT Share a game code Any coach with the code sees the same l",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Dugout",
+      "hasCanvas": false,
+      "bodyTextLen": 184,
+      "bodyTextHash": "6107eca7077f14900a87643ab17e6c4235cbba19cb9a9107e22f75455266c53e",
+      "bodyTextPrefix": "DUGOUT Share a game code Any coach with the code sees the same l",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": true,
+  "baselineReasons": [
+    "desktop: body text replaced (similar length, page start changed)",
+    "mobile: body text replaced (similar length, page start changed)"
+  ]
+}
