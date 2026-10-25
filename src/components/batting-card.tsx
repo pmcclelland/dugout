@@ -1,6 +1,13 @@
 import { useRef, useState } from "react";
 import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import { isSet, positionOf, shortName, type Lineup, type Player } from "@/lib/lineup";
+import {
+  armPointerOrigin,
+  idlePointerOrigin,
+  planPointerDragEnd,
+  pointerHasMoved,
+  type PointerDragEndKind,
+} from "@/lib/pointer-drag";
 import { moveInOrder } from "@/lib/snapshot";
 
 function cn(...parts: Array<string | false | null | undefined>) {
@@ -82,9 +89,26 @@ export function BattingCard({
 }) {
   const [drag, setDrag] = useState<DragPoint | null>(null);
   const dragRef = useRef<DragPoint | null>(null);
-  const origin = useRef({ x: 0, y: 0, moved: false, armed: false });
+  const origin = useRef(idlePointerOrigin());
   const assigned = lineup ? isSet(lineup) : false;
   const dragPlayer = drag ? players.find((player) => player.id === drag.id) : undefined;
+
+  function finishPointer(kind: PointerDragEndKind, point?: { x: number; y: number }) {
+    const hadDrag = dragRef.current !== null;
+    if (!origin.current.armed && !hadDrag) return;
+
+    const plan = planPointerDragEnd(origin.current, hadDrag, kind);
+    const active = dragRef.current;
+    if (plan.tryDrop && active) {
+      const target = point ? indexAt(point.x, point.y) : active.over;
+      if (target !== null) onReorder(moveInOrder(order, active.id, target));
+    }
+    if (plan.clearDrag) {
+      origin.current = idlePointerOrigin();
+      dragRef.current = null;
+      setDrag(null);
+    }
+  }
 
   function spotOf(id: string): string {
     if (!assigned || !lineup) return "—";
@@ -98,7 +122,8 @@ export function BattingCard({
         <p className="text-sm text-muted tabular-nums">{order.length} hitters</p>
       </div>
       <p className="mt-1 text-sm text-pretty text-muted">
-        The order carries across innings. Press the handle and drag, or use the arrows. Tap a name to send them to the plate.
+        The order carries across innings. Press the handle and drag, or use the arrows. Tap a name
+        to send them to the plate.
       </p>
       {order.length === 0 ? (
         <p className="mt-3 text-sm text-muted">Nobody on the roster yet.</p>
@@ -125,17 +150,16 @@ export function BattingCard({
                   onPointerDown={(event) => {
                     if (event.button !== 0) return;
                     event.currentTarget.setPointerCapture(event.pointerId);
-                    origin.current = { x: event.clientX, y: event.clientY, moved: false, armed: true };
+                    origin.current = armPointerOrigin(event.clientX, event.clientY);
                   }}
                   onPointerMove={(event) => {
                     if (!origin.current.armed) return;
-                    if (event.pointerType === "mouse" && event.buttons !== 1) return;
-                    const dx = event.clientX - origin.current.x;
-                    const dy = event.clientY - origin.current.y;
-                    if (!origin.current.moved) {
-                      if (dx * dx + dy * dy < 64) return;
-                      origin.current.moved = true;
+                    if (event.pointerType === "mouse" && event.buttons !== 1) {
+                      finishPointer("up", { x: event.clientX, y: event.clientY });
+                      return;
                     }
+                    if (!pointerHasMoved(origin.current, event.clientX, event.clientY)) return;
+                    origin.current.moved = true;
                     const next = {
                       id,
                       x: event.clientX,
@@ -146,21 +170,13 @@ export function BattingCard({
                     setDrag(next);
                   }}
                   onPointerUp={(event) => {
-                    const active = dragRef.current;
-                    if (origin.current.armed && origin.current.moved && active) {
-                      const target = indexAt(event.clientX, event.clientY);
-                      if (target !== null) onReorder(moveInOrder(order, active.id, target));
-                    }
-                    origin.current.moved = false;
-                    origin.current.armed = false;
-                    dragRef.current = null;
-                    setDrag(null);
+                    finishPointer("up", { x: event.clientX, y: event.clientY });
                   }}
                   onPointerCancel={() => {
-                    origin.current.moved = false;
-                    origin.current.armed = false;
-                    dragRef.current = null;
-                    setDrag(null);
+                    finishPointer("cancel");
+                  }}
+                  onLostPointerCapture={() => {
+                    finishPointer("lostcapture");
                   }}
                 >
                   <GripVertical className="size-5" aria-hidden="true" />
