@@ -382,19 +382,6 @@ export function DugoutApp({
               Batting
             </button>
           </div>
-          {selectedPlayer && side === "defense" ? (
-            <p className="mt-2 rounded-lg bg-foreground px-3 py-2 text-sm text-background">
-              <span className="font-semibold">{selectedPlayer.name}</span>
-              {" — tap a position, or a bench player to swap. "}
-              <button
-                type="button"
-                className="font-semibold underline"
-                onClick={() => setSelected(null)}
-              >
-                Cancel
-              </button>
-            </p>
-          ) : null}
         </header>
 
         <AtBatBar batter={batter} onDeck={onDeck} spot={batterSpot} onAdvance={advanceBatter} />
