@@ -14,6 +14,13 @@ import {
   type Player,
   type PositionId,
 } from "@/lib/lineup";
+import {
+  armPointerOrigin,
+  idlePointerOrigin,
+  planPointerDragEnd,
+  pointerHasMoved,
+  type PointerDragEndKind,
+} from "@/lib/pointer-drag";
 import { useDugout } from "@/lib/store";
 import { useDugoutCloud, type CloudStatus } from "@/lib/sync";
 
@@ -27,6 +34,7 @@ type ChipHandlers = {
   onPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onPointerCancel: () => void;
+  onLostPointerCapture: () => void;
   onClick: () => void;
 };
 
@@ -85,7 +93,7 @@ export function DugoutApp({
   const [drag, setDrag] = useState<DragPoint | null>(null);
   const [copied, setCopied] = useState(false);
   const dragRef = useRef<DragPoint | null>(null);
-  const origin = useRef({ x: 0, y: 0, moved: false, armed: false });
+  const origin = useRef(idlePointerOrigin());
   const suppressClick = useRef(false);
 
   const lineup = innings[inningIndex] ?? innings[0];
@@ -107,8 +115,7 @@ export function DugoutApp({
       ? sitting
           .filter(
             (p) =>
-              p.fromInning < inningIndex &&
-              !positions.some((pos) => previous[pos.id] === p.id),
+              p.fromInning < inningIndex && !positions.some((pos) => previous[pos.id] === p.id),
           )
           .map((p) => p.id)
       : [],
@@ -157,47 +164,59 @@ export function DugoutApp({
     noteChange();
   }
 
+  function finishPointer(
+    kind: PointerDragEndKind,
+    playerId: string,
+    point?: { x: number; y: number },
+  ) {
+    const hadDrag = dragRef.current !== null;
+    if (!origin.current.armed && !hadDrag) return;
+
+    const plan = planPointerDragEnd(origin.current, hadDrag, kind);
+    const active = dragRef.current;
+    if (plan.tap) {
+      onChipTap(playerId);
+    } else if (plan.tryDrop && active) {
+      const target = point ? dropAt(point.x, point.y) : active.over;
+      if (target) onDrop(active.id, target);
+    }
+    if (plan.clearSelected) setSelected(null);
+    if (plan.clearDrag) {
+      origin.current = idlePointerOrigin();
+      dragRef.current = null;
+      setDrag(null);
+    }
+    suppressClick.current = true;
+  }
+
   function pointerHandlers(playerId: string): ChipHandlers {
     return {
       onPointerDown(event) {
         if (event.button !== 0) return;
         event.currentTarget.setPointerCapture(event.pointerId);
-        origin.current = { x: event.clientX, y: event.clientY, moved: false, armed: true };
+        origin.current = armPointerOrigin(event.clientX, event.clientY);
       },
       onPointerMove(event) {
         if (!origin.current.armed) return;
-        if (event.pointerType === "mouse" && event.buttons !== 1) return;
-        const dx = event.clientX - origin.current.x;
-        const dy = event.clientY - origin.current.y;
-        if (!origin.current.moved) {
-          if (dx * dx + dy * dy < 64) return;
-          origin.current.moved = true;
+        if (event.pointerType === "mouse" && event.buttons !== 1) {
+          finishPointer("up", playerId, { x: event.clientX, y: event.clientY });
+          return;
         }
+        if (!pointerHasMoved(origin.current, event.clientX, event.clientY)) return;
+        origin.current.moved = true;
         const over = dropAt(event.clientX, event.clientY);
         const next = { id: playerId, x: event.clientX, y: event.clientY, over };
         dragRef.current = next;
         setDrag(next);
       },
       onPointerUp(event) {
-        const armed = origin.current.armed;
-        const active = dragRef.current;
-        if (armed && origin.current.moved && active) {
-          const target = dropAt(event.clientX, event.clientY);
-          if (target) onDrop(active.id, target);
-        } else if (armed) {
-          onChipTap(playerId);
-        }
-        suppressClick.current = true;
-        origin.current.moved = false;
-        origin.current.armed = false;
-        dragRef.current = null;
-        setDrag(null);
+        finishPointer("up", playerId, { x: event.clientX, y: event.clientY });
       },
       onPointerCancel() {
-        origin.current.moved = false;
-        origin.current.armed = false;
-        dragRef.current = null;
-        setDrag(null);
+        finishPointer("cancel", playerId);
+      },
+      onLostPointerCapture() {
+        finishPointer("lostcapture", playerId);
       },
       onClick() {
         if (suppressClick.current) {
@@ -213,7 +232,8 @@ export function DugoutApp({
   const selectedPlayer = players.find((p) => p.id === selected);
   const batterId = battingOrder[batterIndex];
   const batter = batterId ? players.find((p) => p.id === batterId) : undefined;
-  const onDeckId = battingOrder.length > 1 ? battingOrder[(batterIndex + 1) % battingOrder.length] : undefined;
+  const onDeckId =
+    battingOrder.length > 1 ? battingOrder[(batterIndex + 1) % battingOrder.length] : undefined;
   const onDeck = onDeckId ? players.find((p) => p.id === onDeckId) : undefined;
   const batterSpot =
     batter && lineup && isSet(lineup) ? (positionOf(lineup, batter.id, tenField) ?? "Bench") : null;
@@ -380,52 +400,52 @@ export function DugoutApp({
         <AtBatBar batter={batter} onDeck={onDeck} spot={batterSpot} onAdvance={advanceBatter} />
 
         {side === "defense" ? (
-        <div className="field-slot">
-          <div className="diamond">
-            <div className="absolute inset-0 overflow-hidden rounded-xl">
-              <FieldArt />
+          <div className="field-slot">
+            <div className="diamond">
+              <div className="absolute inset-0 overflow-hidden rounded-xl">
+                <FieldArt />
+              </div>
+              <h2 className="sr-only">Inning {inningIndex + 1} defensive positions</h2>
+              {positions.map((pos) => {
+                const playerId = lineup?.[pos.id] ?? null;
+                const player = playerId ? players.find((p) => p.id === playerId) : undefined;
+                const hot = drag?.over === pos.id;
+                return (
+                  <div
+                    key={pos.id}
+                    data-drop={pos.id}
+                    style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                    className={cn(
+                      "absolute -translate-x-1/2 -translate-y-1/2 rounded-md",
+                      hot && "outline-2 outline-offset-2 outline-chalk",
+                    )}
+                  >
+                    {player ? (
+                      <PlayerChip
+                        player={player}
+                        label={`${player.name}, number ${player.number || "unnumbered"}, ${pos.name}`}
+                        selected={selected === player.id}
+                        atBat={player.id === batter?.id}
+                        dimmed={drag?.id === player.id}
+                        handlers={pointerHandlers(player.id)}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onEmptyTap(pos.id)}
+                        aria-label={`${pos.name}, empty${selectedPlayer ? `, place ${selectedPlayer.name}` : ""}`}
+                        className="chip grid h-9 w-20 place-items-center rounded-sm border border-dashed border-chalk bg-grass-deep/50 text-chalk lg:h-11 lg:w-24"
+                      >
+                        <span className="font-display text-lg leading-none tracking-wide lg:text-xl">
+                          {pos.id}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <h2 className="sr-only">Inning {inningIndex + 1} defensive positions</h2>
-            {positions.map((pos) => {
-              const playerId = lineup?.[pos.id] ?? null;
-              const player = playerId ? players.find((p) => p.id === playerId) : undefined;
-              const hot = drag?.over === pos.id;
-              return (
-                <div
-                  key={pos.id}
-                  data-drop={pos.id}
-                  style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                  className={cn(
-                    "absolute -translate-x-1/2 -translate-y-1/2 rounded-md",
-                    hot && "outline-2 outline-offset-2 outline-chalk",
-                  )}
-                >
-                  {player ? (
-                    <PlayerChip
-                      player={player}
-                      label={`${player.name}, number ${player.number || "unnumbered"}, ${pos.name}`}
-                      selected={selected === player.id}
-                      atBat={player.id === batter?.id}
-                      dimmed={drag?.id === player.id}
-                      handlers={pointerHandlers(player.id)}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onEmptyTap(pos.id)}
-                      aria-label={`${pos.name}, empty${selectedPlayer ? `, place ${selectedPlayer.name}` : ""}`}
-                      className="chip grid h-9 w-20 place-items-center rounded-sm border border-dashed border-chalk bg-grass-deep/50 text-chalk lg:h-11 lg:w-24"
-                    >
-                      <span className="font-display text-lg leading-none tracking-wide lg:text-xl">
-                        {pos.id}
-                      </span>
-                    </button>
-                  )}
-                </div>
-              );
-            })}
           </div>
-        </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <BattingCard
@@ -448,12 +468,7 @@ export function DugoutApp({
       <aside className="border-border px-4 py-4 lg:h-dvh lg:w-96 lg:shrink-0 lg:overflow-y-auto lg:border-l">
         <div className="hidden lg:block">{bench}</div>
         {side === "defense" ? (
-          <PlayingTime
-            players={players}
-            innings={innings}
-            tenField={tenField}
-            report={report}
-          />
+          <PlayingTime players={players} innings={innings} tenField={tenField} report={report} />
         ) : null}
         <RosterEditor
           players={players}
@@ -688,7 +703,9 @@ function PlayingTime({
                   {innings.map((inn, i) => {
                     const filled = isSet(inn);
                     const before = i < player.fromInning;
-                    const spot = filled ? spots.find((pos) => inn[pos.id] === player.id) : undefined;
+                    const spot = filled
+                      ? spots.find((pos) => inn[pos.id] === player.id)
+                      : undefined;
                     return (
                       <span
                         key={i}
@@ -755,9 +772,9 @@ function RosterEditor({
     <section className="mt-4 rounded-lg border border-border bg-card p-3">
       <h2 className="font-display text-xl tracking-wide">Roster</h2>
       <p className="mt-1 text-sm text-muted">
-        <span className="tabular-nums">{players.length}</span> players. New kids join the end of
-        the batting order at inning <span className="tabular-nums">{inningIndex + 1}</span> and are
-        not charged for earlier sits.
+        <span className="tabular-nums">{players.length}</span> players. New kids join the end of the
+        batting order at inning <span className="tabular-nums">{inningIndex + 1}</span> and are not
+        charged for earlier sits.
       </p>
       <form
         className="mt-3 flex gap-2"
@@ -824,7 +841,11 @@ function RosterEditor({
                     <button type="submit" className="btn btn-primary h-11 px-3">
                       Save
                     </button>
-                    <button type="button" className="btn h-11 px-3" onClick={() => setEditing(null)}>
+                    <button
+                      type="button"
+                      className="btn h-11 px-3"
+                      onClick={() => setEditing(null)}
+                    >
                       Cancel
                     </button>
                     {confirmId === player.id ? (
@@ -1024,8 +1045,8 @@ function GameSettings({
         ) : null}
       </div>
       <p className="mt-3 text-sm text-pretty text-muted">
-        Everyone with this code sees the same game. New game keeps the roster and batting order, clears
-        the field, and sends the leadoff hitter up.
+        Everyone with this code sees the same game. New game keeps the roster and batting order,
+        clears the field, and sends the leadoff hitter up.
       </p>
     </section>
   );
