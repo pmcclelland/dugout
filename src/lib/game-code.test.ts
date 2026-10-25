@@ -30,11 +30,13 @@ test("freshGame clears the field and the at-bat but keeps the roster", () => {
     tenField: false,
     battingOrder: ["p1"],
     batterIndex: 0,
+    outIds: ["p1"],
   };
   const next = freshGame(state);
   assert.equal(next.inningIndex, 0);
   assert.equal(next.batterIndex, 0);
   assert.equal(next.innings.length, 2);
   assert.equal(next.innings[0].P, null);
+  assert.deepEqual(next.outIds, []);
   assert.equal(state.players[0]?.name, "Ada Moss");
 });

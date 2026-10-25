@@ -21,6 +21,12 @@ import {
   pointerHasMoved,
   type PointerDragEndKind,
 } from "@/lib/pointer-drag";
+import {
+  availableOrder,
+  availablePlayers,
+  currentBatterIndex,
+  mergeAvailableOrder,
+} from "@/lib/snapshot";
 import { useDugout } from "@/lib/store";
 import { useDugoutCloud, type CloudStatus } from "@/lib/sync";
 
@@ -66,6 +72,7 @@ export function DugoutApp({
   const tenField = useDugout((s) => s.tenField);
   const battingOrder = useDugout((s) => s.battingOrder);
   const batterIndex = useDugout((s) => s.batterIndex);
+  const outIds = useDugout((s) => s.outIds);
   const hint = useDugout((s) => s.hint);
   const canUndo = useDugout((s) => s.past.length > 0);
   const setInningIndex = useDugout((s) => s.setInningIndex);
@@ -84,6 +91,7 @@ export function DugoutApp({
   const loadSample = useDugout((s) => s.loadSample);
   const reorderBatting = useDugout((s) => s.reorderBatting);
   const setAtBat = useDugout((s) => s.setAtBat);
+  const setOut = useDugout((s) => s.setOut);
   const advanceBatter = useDugout((s) => s.advanceBatter);
   const dismissHint = useDugout((s) => s.dismissHint);
   const undo = useDugout((s) => s.undo);
@@ -99,8 +107,11 @@ export function DugoutApp({
   const lineup = innings[inningIndex] ?? innings[0];
   const positions = activePositions(tenField);
   const setNow = lineup ? isSet(lineup) : false;
-  const report = fairness(players, innings, tenField);
-  const sitting = players.filter(
+  const activePlayers = availablePlayers(players, outIds);
+  const liveOrder = availableOrder(battingOrder, outIds);
+  const liveBatterAt = currentBatterIndex(battingOrder, batterIndex, outIds);
+  const report = fairness(activePlayers, innings, tenField);
+  const sitting = activePlayers.filter(
     (p) => lineup && !positions.some((pos) => lineup[pos.id] === p.id),
   );
   const previous = (() => {
@@ -228,12 +239,16 @@ export function DugoutApp({
     };
   }
 
-  const dragPlayer = drag ? players.find((p) => p.id === drag.id) : undefined;
-  const selectedPlayer = players.find((p) => p.id === selected);
-  const batterId = battingOrder[batterIndex];
-  const batter = batterId ? players.find((p) => p.id === batterId) : undefined;
+  const dragPlayer = drag ? activePlayers.find((p) => p.id === drag.id) : undefined;
+  const selectedPlayer = activePlayers.find((p) => p.id === selected);
+  const batterId = battingOrder[liveBatterAt];
+  const batter =
+    batterId && !outIds.includes(batterId) ? players.find((p) => p.id === batterId) : undefined;
+  const liveBatterPos = batterId ? liveOrder.indexOf(batterId) : -1;
   const onDeckId =
-    battingOrder.length > 1 ? battingOrder[(batterIndex + 1) % battingOrder.length] : undefined;
+    liveOrder.length > 1 && liveBatterPos >= 0
+      ? liveOrder[(liveBatterPos + 1) % liveOrder.length]
+      : undefined;
   const onDeck = onDeckId ? players.find((p) => p.id === onDeckId) : undefined;
   const batterSpot =
     batter && lineup && isSet(lineup) ? (positionOf(lineup, batter.id, tenField) ?? "Bench") : null;
@@ -436,12 +451,14 @@ export function DugoutApp({
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <BattingCard
-              players={players}
-              order={battingOrder}
-              batterIndex={batterIndex}
+              players={activePlayers}
+              order={liveOrder}
+              batterIndex={Math.max(0, liveBatterPos)}
               lineup={lineup}
               tenField={tenField}
-              onReorder={reorderBatting}
+              onReorder={(order) =>
+                reorderBatting(mergeAvailableOrder(battingOrder, outIds, order))
+              }
               onSetAtBat={setAtBat}
             />
           </div>
@@ -455,14 +472,25 @@ export function DugoutApp({
       <aside className="border-border px-4 py-4 lg:h-dvh lg:w-96 lg:shrink-0 lg:overflow-y-auto lg:border-l">
         <div className="hidden lg:block">{bench}</div>
         {side === "defense" ? (
-          <PlayingTime players={players} innings={innings} tenField={tenField} report={report} />
+          <PlayingTime
+            players={players}
+            outIds={outIds}
+            innings={innings}
+            tenField={tenField}
+            report={report}
+          />
         ) : null}
         <RosterEditor
           players={players}
+          outIds={outIds}
           inningIndex={inningIndex}
           onAdd={addPlayer}
           onUpdate={updatePlayer}
           onRemove={removePlayer}
+          onSetOut={(id, out) => {
+            setOut(id, out);
+            if (out && selected === id) setSelected(null);
+          }}
         />
         <GameSettings
           tenField={tenField}
@@ -636,11 +664,13 @@ function Bench({
 
 function PlayingTime({
   players,
+  outIds,
   innings,
   tenField,
   report,
 }: {
   players: Player[];
+  outIds: string[];
   innings: ReturnType<typeof useDugout.getState>["innings"];
   tenField: boolean;
   report: ReturnType<typeof fairness>;
@@ -673,6 +703,7 @@ function PlayingTime({
         <ul className="w-max min-w-full divide-y divide-border">
           {ordered.map((player) => {
             const stats = report.byPlayer[player.id] ?? { played: 0, sat: 0 };
+            const out = outIds.includes(player.id);
             return (
               <li key={player.id} className="flex items-stretch gap-2">
                 <span className="sticky left-0 z-10 flex w-36 shrink-0 items-center gap-2 bg-card py-2 shadow-[8px_0_0_0_var(--color-card)]">
@@ -680,31 +711,34 @@ function PlayingTime({
                     {player.number || "–"}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{player.name}</span>
+                    <span className={cn("block truncate font-medium", out && "text-muted")}>
+                      {player.name}
+                    </span>
                     <span className="block text-xs text-muted tabular-nums">
-                      {stats.played} played · {stats.sat} sat
+                      {out ? "Out this game" : `${stats.played} played · ${stats.sat} sat`}
                     </span>
                   </span>
                 </span>
                 <div className="flex items-center gap-1 py-2">
                   {innings.map((inn, i) => {
                     const filled = isSet(inn);
-                    const before = i < player.fromInning;
-                    const spot = filled
-                      ? spots.find((pos) => inn[pos.id] === player.id)
-                      : undefined;
+                    const before = i < player.fromInning || out;
+                    const spot =
+                      !out && filled ? spots.find((pos) => inn[pos.id] === player.id) : undefined;
                     return (
                       <span
                         key={i}
                         role="img"
                         aria-label={
-                          before
-                            ? `Inning ${i + 1}, not on the roster yet`
-                            : !filled
-                              ? `Inning ${i + 1}, not set`
-                              : spot
-                                ? `Inning ${i + 1}, ${spot.name}`
-                                : `Inning ${i + 1}, sitting`
+                          out
+                            ? `Inning ${i + 1}, out this game`
+                            : before
+                              ? `Inning ${i + 1}, not on the roster yet`
+                              : !filled
+                                ? `Inning ${i + 1}, not set`
+                                : spot
+                                  ? `Inning ${i + 1}, ${spot.name}`
+                                  : `Inning ${i + 1}, sitting`
                         }
                         className={cn(
                           "grid h-8 w-8 shrink-0 place-items-center rounded-sm font-display text-sm leading-none tracking-wide",
@@ -730,16 +764,20 @@ function PlayingTime({
 
 function RosterEditor({
   players,
+  outIds,
   inningIndex,
   onAdd,
   onUpdate,
   onRemove,
+  onSetOut,
 }: {
   players: Player[];
+  outIds: string[];
   inningIndex: number;
   onAdd: (name: string, number: string) => void;
   onUpdate: (id: string, patch: { name?: string; number?: string }) => void;
   onRemove: (id: string) => void;
+  onSetOut: (id: string, out: boolean) => void;
 }) {
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
@@ -860,17 +898,42 @@ function RosterEditor({
               </li>
             ) : (
               <li key={player.id} className="border-t border-border">
-                <button
-                  type="button"
-                  className="flex min-h-11 w-full items-center gap-3 py-2 text-left"
-                  onClick={() => startEdit(player)}
-                >
-                  <span className="w-8 text-center font-display text-2xl leading-none tabular-nums">
-                    {player.number || "–"}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{player.name}</span>
-                  <span className="text-sm text-muted">Edit</span>
-                </button>
+                <div className="flex min-h-11 items-center gap-2">
+                  <button
+                    type="button"
+                    className="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-2 text-left"
+                    onClick={() => startEdit(player)}
+                  >
+                    <span className="w-8 text-center font-display text-2xl leading-none tabular-nums">
+                      {player.number || "–"}
+                    </span>
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate font-medium",
+                        outIds.includes(player.id) && "text-muted",
+                      )}
+                    >
+                      {player.name}
+                    </span>
+                    <span className="text-sm text-muted">Edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={outIds.includes(player.id)}
+                    aria-label={
+                      outIds.includes(player.id)
+                        ? `${player.name} is out this game. Mark in.`
+                        : `${player.name} is in this game. Mark out.`
+                    }
+                    className={cn(
+                      "grid h-11 w-14 shrink-0 place-items-center rounded-sm text-sm font-semibold",
+                      outIds.includes(player.id) ? "bg-surface text-muted" : "text-muted",
+                    )}
+                    onClick={() => onSetOut(player.id, !outIds.includes(player.id))}
+                  >
+                    {outIds.includes(player.id) ? "Out" : "In"}
+                  </button>
+                </div>
               </li>
             ),
           )}
@@ -1033,7 +1096,7 @@ function GameSettings({
       </div>
       <p className="mt-3 text-sm text-pretty text-muted">
         Everyone with this code sees the same game. New game keeps the roster and batting order,
-        clears the field, and sends the leadoff hitter up.
+        clears the field and who is out, and sends the leadoff hitter up.
       </p>
     </section>
   );
