@@ -22,6 +22,8 @@
   --radius-md: 0.75rem;
   --radius-lg: 1.25rem;
   --radius-xl: 1.75rem;
+  /* Name column + six inning squares + card/aside padding, with a little slack. */
+  --width-sidebar: 28rem;
   --shadow-chip: 0 1px 2px color-mix(in oklab, var(--color-foreground) 22%, transparent);
   --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
 }

@@ -469,7 +469,7 @@ export function DugoutApp({
         ) : null}
       </div>
 
-      <aside className="border-border px-4 py-4 lg:h-dvh lg:w-96 lg:shrink-0 lg:overflow-y-auto lg:border-l">
+      <aside className="border-border px-4 py-4 lg:h-dvh lg:w-sidebar lg:shrink-0 lg:overflow-y-auto lg:border-l">
         <div className="hidden lg:block">{bench}</div>
         {side === "defense" ? (
           <PlayingTime
