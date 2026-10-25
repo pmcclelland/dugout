@@ -665,51 +665,61 @@ function PlayingTime({
       <p className="mt-1 text-sm text-pretty text-muted">
         {names.length
           ? `${names.join(", ")} sat back to back. Rebalance, or drag them in.`
-          : "Filled squares are on the field."}
+          : "Filled squares show the position they played."}
       </p>
-      <ul className="mt-3 divide-y divide-border">
-        {ordered.map((player) => {
-          const stats = report.byPlayer[player.id] ?? { played: 0, sat: 0 };
-          return (
-            <li key={player.id} className="flex items-center gap-2 py-2">
-              <span className="w-8 shrink-0 text-center font-display text-2xl leading-none tabular-nums">
-                {player.number || "–"}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{player.name}</span>
-                <span className="block text-xs text-muted tabular-nums">
-                  {stats.played} played · {stats.sat} sat
+      <div className="mt-3 overflow-x-auto">
+        <ul className="w-max min-w-full divide-y divide-border">
+          {ordered.map((player) => {
+            const stats = report.byPlayer[player.id] ?? { played: 0, sat: 0 };
+            return (
+              <li key={player.id} className="flex items-stretch gap-2">
+                <span className="sticky left-0 z-10 flex w-36 shrink-0 items-center gap-2 bg-card py-2 shadow-[8px_0_0_0_var(--color-card)]">
+                  <span className="w-8 shrink-0 text-center font-display text-2xl leading-none tabular-nums">
+                    {player.number || "–"}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{player.name}</span>
+                    <span className="block text-xs text-muted tabular-nums">
+                      {stats.played} played · {stats.sat} sat
+                    </span>
+                  </span>
                 </span>
-              </span>
-              <div className="flex gap-1 overflow-x-auto">
-                {innings.map((inn, i) => {
-                  const filled = isSet(inn);
-                  const before = i < player.fromInning;
-                  const on = filled && spots.some((pos) => inn[pos.id] === player.id);
-                  return (
-                    <span
-                      key={i}
-                      role="img"
-                      aria-label={
-                        before
-                          ? `Inning ${i + 1}, not on the roster yet`
-                          : `Inning ${i + 1}, ${!filled ? "not set" : on ? "playing" : "sitting"}`
-                      }
-                      className={cn(
-                        "h-8 w-5 shrink-0 rounded-sm",
-                        before && "bg-surface",
-                        !before && !filled && "border border-dashed border-border",
-                        !before && filled && on && "bg-accent",
-                        !before && filled && !on && "border border-border bg-surface",
-                      )}
-                    />
-                  );
-                })}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                <div className="flex items-center gap-1 py-2">
+                  {innings.map((inn, i) => {
+                    const filled = isSet(inn);
+                    const before = i < player.fromInning;
+                    const spot = filled ? spots.find((pos) => inn[pos.id] === player.id) : undefined;
+                    return (
+                      <span
+                        key={i}
+                        role="img"
+                        aria-label={
+                          before
+                            ? `Inning ${i + 1}, not on the roster yet`
+                            : !filled
+                              ? `Inning ${i + 1}, not set`
+                              : spot
+                                ? `Inning ${i + 1}, ${spot.name}`
+                                : `Inning ${i + 1}, sitting`
+                        }
+                        className={cn(
+                          "grid h-8 w-8 shrink-0 place-items-center rounded-sm font-display text-sm leading-none tracking-wide",
+                          before && "bg-surface",
+                          !before && !filled && "border border-dashed border-border",
+                          !before && filled && spot && "bg-accent text-accent-foreground",
+                          !before && filled && !spot && "border border-border bg-surface",
+                        )}
+                      >
+                        {spot ? spot.id : null}
+                      </span>
+                    );
+                  })}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </section>
   );
 }
