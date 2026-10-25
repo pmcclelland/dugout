@@ -2,7 +2,6 @@ import { useState } from "react";
 import { FieldArt } from "@/components/field-art";
 import { createGame, loadGame } from "@/lib/dugout.functions";
 import { formatCode, normalizeCode } from "@/lib/game-code";
-import { useDugout } from "@/lib/store";
 
 export function GameCodeScreen({
   notice,
@@ -22,18 +21,8 @@ export function GameCodeScreen({
     setBusy("start");
     setError(null);
     try {
-      await useDugout.persist.rehydrate();
-      const state = useDugout.getState();
       const created = await createGame({
-        data: {
-          teamName: name,
-          players: state.players,
-          innings: state.innings,
-          inningIndex: state.inningIndex,
-          tenField: state.tenField,
-          battingOrder: state.battingOrder,
-          batterIndex: state.batterIndex,
-        },
+        data: { teamName: name },
       });
       onOpen(created.code);
     } catch {
@@ -111,7 +100,11 @@ export function GameCodeScreen({
             onChange={(event) => setEntry(event.target.value.toUpperCase())}
             className="input min-w-0 flex-1 font-display text-2xl tracking-wide uppercase"
           />
-          <button type="submit" className="btn h-12 shrink-0 px-4" disabled={busy !== null || !known}>
+          <button
+            type="submit"
+            className="btn h-12 shrink-0 px-4"
+            disabled={busy !== null || !known}
+          >
             {busy === "join" ? "…" : "Join"}
           </button>
         </form>

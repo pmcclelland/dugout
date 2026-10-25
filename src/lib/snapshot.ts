@@ -4,10 +4,11 @@ import {
   normalizeLineup,
   type Lineup,
   type Player,
-} from "@/lib/lineup";
+} from "./lineup.ts";
 
 export const MAX_PLAYERS = 30;
 export const MAX_INNINGS = 12;
+export const DEFAULT_INNINGS = 6;
 
 export type DugoutState = {
   teamName: string;
@@ -21,6 +22,31 @@ export type DugoutState = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
+}
+
+/** A blank game: no roster, no assignments, no batting order. */
+export function emptyGame(teamName = ""): DugoutState {
+  const name = teamName.trim().slice(0, 40);
+  return {
+    teamName: name || "Team",
+    players: [],
+    innings: Array.from({ length: DEFAULT_INNINGS }, () => emptyLineup()),
+    inningIndex: 0,
+    tenField: false,
+    battingOrder: [],
+    batterIndex: 0,
+  };
+}
+
+/**
+ * State for a newly created team. Keeps only the name; any roster, lineup,
+ * or playing-time fields on the input are ignored.
+ */
+export function newTeamFromCreateInput(input: unknown): DugoutState {
+  const source = isRecord(input) ? input : {};
+  const teamName = typeof source.teamName === "string" ? source.teamName.trim().slice(0, 40) : "";
+  if (!teamName) throw new Error("Invalid team");
+  return emptyGame(teamName);
 }
 
 function clampIndex(index: unknown, length: number): number {
@@ -93,8 +119,7 @@ export function normalizeSnapshot(raw: unknown): DugoutState {
   const ids = new Set(players.map((player) => player.id));
   const innings = cleanLineups(source.innings, ids, tenField);
   const battingOrder = alignBattingOrder(source.battingOrder, players);
-  const teamName =
-    typeof source.teamName === "string" ? source.teamName.trim().slice(0, 40) : "";
+  const teamName = typeof source.teamName === "string" ? source.teamName.trim().slice(0, 40) : "";
   return {
     teamName: teamName || "Team",
     players,

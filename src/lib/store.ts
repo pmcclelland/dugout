@@ -13,6 +13,7 @@ import {
 import { freshGame } from "@/lib/game-code";
 import {
   alignBattingOrder,
+  emptyGame,
   MAX_INNINGS,
   normalizeSnapshot,
   type DugoutState,
@@ -69,7 +70,10 @@ function withHistory(s: State, next: Partial<Snapshot>): Partial<State> {
   };
 }
 
-function orderKeepingBatter(s: Snapshot, order: string[]): Pick<Snapshot, "battingOrder" | "batterIndex"> {
+function orderKeepingBatter(
+  s: Snapshot,
+  order: string[],
+): Pick<Snapshot, "battingOrder" | "batterIndex"> {
   const battingOrder = alignBattingOrder(order, s.players);
   const currentId = s.battingOrder[s.batterIndex];
   const found = currentId ? battingOrder.indexOf(currentId) : -1;
@@ -83,7 +87,7 @@ function findPos(lineup: Lineup, playerId: string, tenField: boolean): PositionI
   return null;
 }
 
-const initial = sampleGame();
+const initial = emptyGame();
 
 export const useDugout = create<State>()(
   persist(

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { GAME_CODE_ALPHABET, normalizeCode } from "@/lib/game-code";
-import { normalizeSnapshot, type DugoutState } from "@/lib/snapshot";
+import { newTeamFromCreateInput, normalizeSnapshot, type DugoutState } from "@/lib/snapshot";
 
 export type GameRecord = {
   state: DugoutState;
@@ -24,7 +24,11 @@ function isCodeInput(value: unknown): value is { code: unknown; state?: unknown 
 
 function requireCode(input: unknown): string {
   const raw =
-    typeof input === "string" ? input : isCodeInput(input) && typeof input.code === "string" ? input.code : "";
+    typeof input === "string"
+      ? input
+      : isCodeInput(input) && typeof input.code === "string"
+        ? input.code
+        : "";
   const code = normalizeCode(raw);
   if (!code) throw new Error("Invalid code");
   return code;
@@ -39,7 +43,7 @@ function newCode(): string {
 }
 
 export const createGame = createServerFn({ method: "POST" })
-  .validator((input: unknown): DugoutState => normalizeSnapshot(input))
+  .validator((input: unknown): DugoutState => newTeamFromCreateInput(input))
   .handler(async ({ data }) => {
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
