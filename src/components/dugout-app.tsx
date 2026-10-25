@@ -314,48 +314,16 @@ export function DugoutApp({
                     aria-label={`Inning ${i + 1}${filled ? ", lineup set" : ", empty"}`}
                     onClick={() => setInningIndex(i)}
                     className={cn(
-                      "relative grid h-11 w-11 shrink-0 place-items-center rounded-sm font-display text-2xl tabular-nums",
+                      "grid h-11 w-11 shrink-0 place-items-center rounded-sm font-display text-2xl tabular-nums",
                       current
                         ? "bg-accent text-accent-foreground"
                         : "border border-border bg-card text-foreground",
                     )}
                   >
                     {i + 1}
-                    <span
-                      className={cn(
-                        "absolute bottom-1 h-1 w-1 rounded-full",
-                        filled ? "bg-current" : "border border-current bg-transparent",
-                      )}
-                    />
                   </button>
                 );
               })}
-            </div>
-            <div className="flex h-11 shrink-0 overflow-hidden rounded-sm border border-border">
-              <button
-                type="button"
-                aria-pressed={!tenField}
-                aria-label="Nine on the field"
-                onClick={() => setTenField(false)}
-                className={cn(
-                  "w-11 font-display text-xl",
-                  !tenField ? "bg-accent text-accent-foreground" : "bg-card text-foreground",
-                )}
-              >
-                9
-              </button>
-              <button
-                type="button"
-                aria-pressed={tenField}
-                aria-label="Ten on the field, with a rover"
-                onClick={() => setTenField(true)}
-                className={cn(
-                  "w-11 border-l border-border font-display text-xl",
-                  tenField ? "bg-accent text-accent-foreground" : "bg-card text-foreground",
-                )}
-              >
-                10
-              </button>
             </div>
             <button
               type="button"
@@ -495,6 +463,8 @@ export function DugoutApp({
           onRemove={removePlayer}
         />
         <GameSettings
+          tenField={tenField}
+          onTenField={setTenField}
           inningCount={innings.length}
           onLength={setInningsLength}
           onClearAssignments={clearAssignments}
@@ -898,6 +868,8 @@ function RosterEditor({
 }
 
 function GameSettings({
+  tenField,
+  onTenField,
   inningCount,
   onLength,
   onClearAssignments,
@@ -906,6 +878,8 @@ function GameSettings({
   onNewGame,
   onLeave,
 }: {
+  tenField: boolean;
+  onTenField: (ten: boolean) => void;
   inningCount: number;
   onLength: (n: number) => void;
   onClearAssignments: () => void;
@@ -918,6 +892,35 @@ function GameSettings({
   return (
     <section className="mt-4 mb-8 rounded-lg border border-border bg-card p-3">
       <h2 className="font-display text-xl tracking-wide">Game</h2>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-sm">On the field</p>
+        <div className="flex h-11 overflow-hidden rounded-sm border border-border">
+          <button
+            type="button"
+            aria-pressed={!tenField}
+            aria-label="Nine on the field"
+            onClick={() => onTenField(false)}
+            className={cn(
+              "w-11 font-display text-xl",
+              !tenField ? "bg-accent text-accent-foreground" : "bg-card text-foreground",
+            )}
+          >
+            9
+          </button>
+          <button
+            type="button"
+            aria-pressed={tenField}
+            aria-label="Ten on the field, with a rover"
+            onClick={() => onTenField(true)}
+            className={cn(
+              "w-11 border-l border-border font-display text-xl",
+              tenField ? "bg-accent text-accent-foreground" : "bg-card text-foreground",
+            )}
+          >
+            10
+          </button>
+        </div>
+      </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-sm">Innings in this game</p>
         <div className="flex items-center gap-2">
