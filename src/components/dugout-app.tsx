@@ -447,14 +447,14 @@ export function DugoutApp({
 
       <aside className="border-border px-4 py-4 lg:h-dvh lg:w-96 lg:shrink-0 lg:overflow-y-auto lg:border-l">
         <div className="hidden lg:block">{bench}</div>
-        <PlayingTime
-          players={players}
-          innings={innings}
-          inningIndex={inningIndex}
-          tenField={tenField}
-          report={report}
-          onJump={setInningIndex}
-        />
+        {side === "defense" ? (
+          <PlayingTime
+            players={players}
+            innings={innings}
+            tenField={tenField}
+            report={report}
+          />
+        ) : null}
         <RosterEditor
           players={players}
           inningIndex={inningIndex}
@@ -635,17 +635,13 @@ function Bench({
 function PlayingTime({
   players,
   innings,
-  inningIndex,
   tenField,
   report,
-  onJump,
 }: {
   players: Player[];
   innings: ReturnType<typeof useDugout.getState>["innings"];
-  inningIndex: number;
   tenField: boolean;
   report: ReturnType<typeof fairness>;
-  onJump: (index: number) => void;
 }) {
   const ordered = [...players].sort((a, b) => {
     const na = Number.parseInt(a.number, 10);
@@ -669,7 +665,7 @@ function PlayingTime({
       <p className="mt-1 text-sm text-pretty text-muted">
         {names.length
           ? `${names.join(", ")} sat back to back. Rebalance, or drag them in.`
-          : "Filled squares are on the field. Tap one to open that inning."}
+          : "Filled squares are on the field."}
       </p>
       <ul className="mt-3 divide-y divide-border">
         {ordered.map((player) => {
@@ -691,22 +687,20 @@ function PlayingTime({
                   const before = i < player.fromInning;
                   const on = filled && spots.some((pos) => inn[pos.id] === player.id);
                   return (
-                    <button
+                    <span
                       key={i}
-                      type="button"
+                      role="img"
                       aria-label={
                         before
                           ? `Inning ${i + 1}, not on the roster yet`
                           : `Inning ${i + 1}, ${!filled ? "not set" : on ? "playing" : "sitting"}`
                       }
-                      onClick={() => onJump(i)}
                       className={cn(
                         "h-8 w-5 shrink-0 rounded-sm",
                         before && "bg-surface",
                         !before && !filled && "border border-dashed border-border",
                         !before && filled && on && "bg-accent",
                         !before && filled && !on && "border border-border bg-surface",
-                        i === inningIndex && "outline-2 outline-offset-1 outline-foreground",
                       )}
                     />
                   );
