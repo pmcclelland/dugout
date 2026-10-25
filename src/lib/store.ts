@@ -13,8 +13,11 @@ import {
 import { freshGame } from "@/lib/game-code";
 import {
   alignBattingOrder,
+  applyAvailability,
+  availablePlayers,
   emptyGame,
   MAX_INNINGS,
+  nextAvailableIndex,
   normalizeSnapshot,
   type DugoutState,
 } from "@/lib/snapshot";
@@ -41,6 +44,7 @@ type State = Snapshot & {
   clearPlayers: () => void;
   startNewGame: () => void;
   loadSample: () => void;
+  setOut: (playerId: string, out: boolean) => void;
   reorderBatting: (order: string[]) => void;
   setAtBat: (playerId: string) => void;
   advanceBatter: () => void;
@@ -60,6 +64,7 @@ function snapshot(s: Snapshot): Snapshot {
     tenField: s.tenField,
     battingOrder: [...s.battingOrder],
     batterIndex: s.batterIndex,
+    outIds: [...s.outIds],
   };
 }
 
@@ -177,11 +182,13 @@ export const useDugout = create<State>()(
             }),
             battingOrder,
             batterIndex,
+            outIds: s.outIds.filter((pid) => pid !== id),
           }),
         );
       },
       move: (playerId, target) => {
         const s = get();
+        if (s.outIds.includes(playerId)) return;
         const current = s.innings[s.inningIndex];
         if (!current) return;
         const prev = findPos(current, playerId, s.tenField);
@@ -202,6 +209,7 @@ export const useDugout = create<State>()(
       exchange: (a, b) => {
         if (a === b) return;
         const s = get();
+        if (s.outIds.includes(a) || s.outIds.includes(b)) return;
         const current = s.innings[s.inningIndex];
         if (!current) return;
         const posA = findPos(current, a, s.tenField);
@@ -215,7 +223,12 @@ export const useDugout = create<State>()(
       },
       rebalance: () => {
         const s = get();
-        const lineup = balanceInning(s.players, s.innings, s.inningIndex, s.tenField);
+        const lineup = balanceInning(
+          availablePlayers(s.players, s.outIds),
+          s.innings,
+          s.inningIndex,
+          s.tenField,
+        );
         const innings = s.innings.map((l, i) => (i === s.inningIndex ? lineup : l));
         set(withHistory(s, { innings }));
       },
@@ -227,12 +240,22 @@ export const useDugout = create<State>()(
           index += 1;
           const upcoming = innings[index];
           if (!upcoming || !isSet(upcoming)) {
-            innings[index] = balanceInning(s.players, innings, index, s.tenField);
+            innings[index] = balanceInning(
+              availablePlayers(s.players, s.outIds),
+              innings,
+              index,
+              s.tenField,
+            );
           }
         } else if (innings.length < MAX_INNINGS) {
           innings = [...innings, emptyLineup()];
           index = innings.length - 1;
-          innings[index] = balanceInning(s.players, innings, index, s.tenField);
+          innings[index] = balanceInning(
+            availablePlayers(s.players, s.outIds),
+            innings,
+            index,
+            s.tenField,
+          );
         } else {
           return;
         }
@@ -259,8 +282,21 @@ export const useDugout = create<State>()(
             innings: s.innings.map(() => emptyLineup()),
             battingOrder: [],
             batterIndex: 0,
+            outIds: [],
           }),
         );
+      },
+      setOut: (playerId, out) => {
+        const s = get();
+        const next = applyAvailability(s, playerId, out);
+        if (
+          next.batterIndex === s.batterIndex &&
+          next.outIds.length === s.outIds.length &&
+          next.outIds.every((id, i) => id === s.outIds[i])
+        ) {
+          return;
+        }
+        set(withHistory(s, next));
       },
       loadSample: () => {
         const s = get();
@@ -279,6 +315,7 @@ export const useDugout = create<State>()(
       },
       setAtBat: (playerId) => {
         const s = get();
+        if (s.outIds.includes(playerId)) return;
         const index = s.battingOrder.indexOf(playerId);
         if (index < 0 || index === s.batterIndex) return;
         set(withHistory(s, { batterIndex: index }));
@@ -286,7 +323,9 @@ export const useDugout = create<State>()(
       advanceBatter: () => {
         const s = get();
         if (s.battingOrder.length === 0) return;
-        set(withHistory(s, { batterIndex: (s.batterIndex + 1) % s.battingOrder.length }));
+        const next = nextAvailableIndex(s.battingOrder, s.batterIndex + 1, s.outIds);
+        if (next === s.batterIndex) return;
+        set(withHistory(s, { batterIndex: next }));
       },
       applyRemote: (raw) => {
         const next = normalizeSnapshot(raw);
@@ -314,6 +353,7 @@ export const useDugout = create<State>()(
         tenField: s.tenField,
         battingOrder: s.battingOrder,
         batterIndex: s.batterIndex,
+        outIds: s.outIds,
         hint: s.hint,
       }),
       merge: (persisted, current) => {

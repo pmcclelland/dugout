@@ -14,12 +14,15 @@ export function formatCode(code: string): string {
   return `${code.slice(0, 3)}-${code.slice(3)}`;
 }
 
-/** Keep the roster, team name, and batting order. Clear the field and the at-bat. */
-export function freshGame(state: DugoutState): Pick<DugoutState, "innings" | "inningIndex" | "batterIndex"> {
+/** Keep the roster, team name, and batting order. Clear the field, at-bat, and who is out. */
+export function freshGame(
+  state: DugoutState,
+): Pick<DugoutState, "innings" | "inningIndex" | "batterIndex" | "outIds"> {
   const count = Math.max(1, state.innings.length);
   return {
     innings: Array.from({ length: count }, () => emptyLineup()),
     inningIndex: 0,
     batterIndex: 0,
+    outIds: [],
   };
 }

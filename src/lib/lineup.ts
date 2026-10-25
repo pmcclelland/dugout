@@ -295,5 +295,6 @@ export function sampleGame() {
     tenField: false,
     battingOrder: players.map((player) => player.id),
     batterIndex: 0,
+    outIds: [],
   };
 }

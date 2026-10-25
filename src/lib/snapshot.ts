@@ -18,6 +18,8 @@ export type DugoutState = {
   tenField: boolean;
   battingOrder: string[];
   batterIndex: number;
+  /** Player ids marked out for this game only. Missing on older saves. */
+  outIds: string[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -35,6 +37,7 @@ export function emptyGame(teamName = ""): DugoutState {
     tenField: false,
     battingOrder: [],
     batterIndex: 0,
+    outIds: [],
   };
 }
 
@@ -117,7 +120,9 @@ export function normalizeSnapshot(raw: unknown): DugoutState {
   }
   const tenField = source.tenField === true;
   const ids = new Set(players.map((player) => player.id));
-  const innings = cleanLineups(source.innings, ids, tenField);
+  const outIds = cleanOutIds(source.outIds, ids);
+  const playableIds = new Set([...ids].filter((id) => !outIds.includes(id)));
+  const innings = cleanLineups(source.innings, playableIds, tenField);
   const battingOrder = alignBattingOrder(source.battingOrder, players);
   const teamName = typeof source.teamName === "string" ? source.teamName.trim().slice(0, 40) : "";
   return {
@@ -128,7 +133,97 @@ export function normalizeSnapshot(raw: unknown): DugoutState {
     tenField,
     battingOrder,
     batterIndex: clampIndex(source.batterIndex, battingOrder.length),
+    outIds,
   };
+}
+
+export function cleanOutIds(raw: unknown, playerIds: Set<string>): string[] {
+  if (!Array.isArray(raw)) return [];
+  const next: string[] = [];
+  const seen = new Set<string>();
+  for (const id of raw) {
+    if (typeof id !== "string" || !playerIds.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    next.push(id);
+  }
+  return next;
+}
+
+export function availablePlayers(players: Player[], outIds: string[]): Player[] {
+  if (outIds.length === 0) return players;
+  const out = new Set(outIds);
+  return players.filter((player) => !out.has(player.id));
+}
+
+export function availableOrder(order: string[], outIds: string[]): string[] {
+  if (outIds.length === 0) return order;
+  const out = new Set(outIds);
+  return order.filter((id) => !out.has(id));
+}
+
+/** Keep out players in their slots; replace the rest with `available`. */
+export function mergeAvailableOrder(
+  fullOrder: string[],
+  outIds: string[],
+  available: string[],
+): string[] {
+  const out = new Set(outIds);
+  let index = 0;
+  return fullOrder.map((id) => (out.has(id) ? id : (available[index++] ?? id)));
+}
+
+export function nextAvailableIndex(order: string[], start: number, outIds: string[]): number {
+  if (order.length === 0) return 0;
+  const out = new Set(outIds);
+  const begin = ((start % order.length) + order.length) % order.length;
+  for (let step = 0; step < order.length; step += 1) {
+    const index = (begin + step) % order.length;
+    const id = order[index];
+    if (id && !out.has(id)) return index;
+  }
+  return 0;
+}
+
+export function currentBatterIndex(order: string[], batterIndex: number, outIds: string[]): number {
+  const id = order[batterIndex];
+  if (id && !outIds.includes(id)) return batterIndex;
+  return nextAvailableIndex(order, batterIndex, outIds);
+}
+
+export function pullPlayerFromInnings(innings: Lineup[], playerId: string): Lineup[] {
+  return innings.map((lineup) => {
+    let changed = false;
+    const next = { ...lineup };
+    for (const pos of ALL_POSITION_IDS) {
+      if (next[pos] === playerId) {
+        next[pos] = null;
+        changed = true;
+      }
+    }
+    return changed ? next : lineup;
+  });
+}
+
+export function applyAvailability(
+  state: DugoutState,
+  playerId: string,
+  out: boolean,
+): Pick<DugoutState, "outIds" | "innings" | "batterIndex"> {
+  if (!state.players.some((player) => player.id === playerId)) {
+    return { outIds: state.outIds, innings: state.innings, batterIndex: state.batterIndex };
+  }
+  const currentlyOut = state.outIds.includes(playerId);
+  if (currentlyOut === out) {
+    return { outIds: state.outIds, innings: state.innings, batterIndex: state.batterIndex };
+  }
+  const outIds = out ? [...state.outIds, playerId] : state.outIds.filter((id) => id !== playerId);
+  const innings = out ? pullPlayerFromInnings(state.innings, playerId) : state.innings;
+  let batterIndex = state.batterIndex;
+  const currentId = state.battingOrder[batterIndex];
+  if (!currentId || outIds.includes(currentId)) {
+    batterIndex = nextAvailableIndex(state.battingOrder, batterIndex, outIds);
+  }
+  return { outIds, innings, batterIndex };
 }
 
 /** Move `id` so it lands at `toIndex`. No-op when that is already true. */
