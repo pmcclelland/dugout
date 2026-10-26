@@ -31,6 +31,28 @@ test("freshGame clears the field and the at-bat but keeps the roster", () => {
     battingOrder: ["p1"],
     batterIndex: 0,
     outIds: ["p1"],
+    scorecard: {
+      plays: [
+        {
+          id: "old",
+          inning: 0,
+          batterId: "p1",
+          result: "1B",
+          notation: "1B",
+          basesReached: 1,
+          rbis: 0,
+          outs: 0,
+          scoredIds: [],
+          positions: [],
+          outKind: null,
+          runnersOut: [],
+        },
+      ],
+      trackPitches: true,
+      pitches: [{ playerId: "p1", count: 8 }],
+      opponentRuns: [2],
+      closed: true,
+    },
   };
   const next = freshGame(state);
   assert.equal(next.inningIndex, 0);
@@ -38,5 +60,8 @@ test("freshGame clears the field and the at-bat but keeps the roster", () => {
   assert.equal(next.innings.length, 2);
   assert.equal(next.innings[0].P, null);
   assert.deepEqual(next.outIds, []);
+  assert.deepEqual(next.scorecard.plays, []);
+  assert.equal(next.scorecard.trackPitches, true);
+  assert.equal(next.scorecard.closed, false);
   assert.equal(state.players[0]?.name, "Ada Moss");
 });

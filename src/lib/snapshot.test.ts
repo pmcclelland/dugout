@@ -22,6 +22,8 @@ function assertCleanSlate(state: ReturnType<typeof emptyGame>, teamName: string)
   assert.equal(state.inningIndex, 0);
   assert.equal(state.tenField, false);
   assert.deepEqual(state.outIds, []);
+  assert.deepEqual(state.scorecard.plays, []);
+  assert.equal(state.scorecard.trackPitches, false);
   assert.equal(state.innings.length, DEFAULT_INNINGS);
   for (const inning of state.innings) {
     for (const pos of ALL_POSITION_IDS) {
@@ -66,6 +68,17 @@ test("sampleGame still ships the Mudcats demo for Load sample roster", () => {
   assert.ok(sample.players.length > 0);
   assert.deepEqual(sample.outIds, []);
   assert.ok(sample.innings.some((inning) => ALL_POSITION_IDS.some((pos) => inning[pos])));
+});
+
+test("normalizeSnapshot treats a missing scorecard as a blank card", () => {
+  const next = normalizeSnapshot({
+    teamName: "Hawks",
+    players: [{ id: "p1", name: "Ada", number: "4", fromInning: 0 }],
+    battingOrder: ["p1"],
+  });
+  assert.deepEqual(next.scorecard.plays, []);
+  assert.equal(next.scorecard.closed, false);
+  assert.equal(next.scorecard.trackPitches, false);
 });
 
 test("normalizeSnapshot treats missing outIds as everyone available", () => {

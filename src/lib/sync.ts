@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { loadGame, saveGame } from "@/lib/dugout.functions";
+import { cloneScorecard } from "@/lib/scorecard";
 import type { DugoutState } from "@/lib/snapshot";
 import { useDugout } from "@/lib/store";
 
@@ -15,6 +16,7 @@ function pick(state: DugoutState): DugoutState {
     battingOrder: state.battingOrder,
     batterIndex: state.batterIndex,
     outIds: state.outIds,
+    scorecard: cloneScorecard(state.scorecard),
   };
 }
 

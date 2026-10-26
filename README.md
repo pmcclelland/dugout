@@ -10,6 +10,7 @@ Lineup board for youth baseball and softball. Name the team, start a game, and s
 - Play nine, or ten with a rover.
 - Fill an empty inning, or rebalance so sits stay even. The board flags anyone who sat back to back.
 - Keep the batting order, the at-bat, and who is on deck.
+- Record the scorecard live: hits, walks, strikeouts, and outs by tapping the diamond (6-3, F8). Inning totals add up.
 - Move through up to twelve innings. Undo is one tap.
 - Start a new game on the same code. The roster and batting order stay, the field clears, and the leadoff hitter comes up.
 
