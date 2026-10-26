@@ -296,5 +296,12 @@ export function sampleGame() {
     battingOrder: players.map((player) => player.id),
     batterIndex: 0,
     outIds: [],
+    scorecard: {
+      plays: [],
+      trackPitches: false,
+      pitches: [],
+      opponentRuns: [],
+      closed: false,
+    },
   };
 }

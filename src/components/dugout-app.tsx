@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Undo2 } from "lucide-react";
 import { AtBatBar, BattingCard } from "@/components/batting-card";
 import { FieldArt } from "@/components/field-art";
+import { PitchSetting, ScorecardPanel } from "@/components/scorecard-panel";
 import { DugoutSkeleton } from "@/components/sign-in-screen";
 import { formatCode } from "@/lib/game-code";
 import {
@@ -93,11 +94,18 @@ export function DugoutApp({
   const setAtBat = useDugout((s) => s.setAtBat);
   const setOut = useDugout((s) => s.setOut);
   const advanceBatter = useDugout((s) => s.advanceBatter);
+  const recordPlay = useDugout((s) => s.recordPlay);
+  const undoLastPlay = useDugout((s) => s.undoLastPlay);
+  const setTrackPitches = useDugout((s) => s.setTrackPitches);
+  const addPitch = useDugout((s) => s.addPitch);
+  const setOpponentRuns = useDugout((s) => s.setOpponentRuns);
+  const setScoreClosed = useDugout((s) => s.setScoreClosed);
+  const scorecard = useDugout((s) => s.scorecard);
   const dismissHint = useDugout((s) => s.dismissHint);
   const undo = useDugout((s) => s.undo);
 
   const [selected, setSelected] = useState<string | null>(null);
-  const [side, setSide] = useState<"defense" | "batting">("defense");
+  const [side, setSide] = useState<"defense" | "batting" | "score">("defense");
   const [drag, setDrag] = useState<DragPoint | null>(null);
   const [copied, setCopied] = useState(false);
   const dragRef = useRef<DragPoint | null>(null);
@@ -297,7 +305,7 @@ export function DugoutApp({
           <div className="mt-1 flex items-center justify-between gap-2">
             <div className="text-sm text-pretty text-muted">
               Inning <span className="tabular-nums">{inningIndex + 1}</span>{" "}
-              {side === "defense" ? "defense" : "batting"}
+              {side === "defense" ? "defense" : side === "batting" ? "batting" : "score"}
               {" · "}
               <span className="tabular-nums">{sitting.length}</span> sitting
               {" · "}
@@ -373,7 +381,7 @@ export function DugoutApp({
               <Undo2 className="size-5" aria-hidden="true" />
             </button>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-1 rounded-sm border border-border p-1">
+          <div className="mt-2 grid grid-cols-3 gap-1 rounded-sm border border-border p-1">
             <button
               type="button"
               aria-pressed={side === "defense"}
@@ -396,10 +404,23 @@ export function DugoutApp({
             >
               Batting
             </button>
+            <button
+              type="button"
+              aria-pressed={side === "score"}
+              onClick={() => setSide("score")}
+              className={cn(
+                "h-11 rounded-sm font-display text-xl tracking-wide",
+                side === "score" ? "bg-accent text-accent-foreground" : "text-foreground",
+              )}
+            >
+              Score
+            </button>
           </div>
         </header>
 
-        <AtBatBar batter={batter} onDeck={onDeck} spot={batterSpot} onAdvance={advanceBatter} />
+        {side !== "score" ? (
+          <AtBatBar batter={batter} onDeck={onDeck} spot={batterSpot} onAdvance={advanceBatter} />
+        ) : null}
 
         {side === "defense" ? (
           <div className="field-slot">
@@ -448,7 +469,7 @@ export function DugoutApp({
               })}
             </div>
           </div>
-        ) : (
+        ) : side === "batting" ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <BattingCard
               players={activePlayers}
@@ -462,6 +483,25 @@ export function DugoutApp({
               onSetAtBat={setAtBat}
             />
           </div>
+        ) : (
+          <ScorecardPanel
+            teamName={teamName}
+            players={players}
+            order={liveOrder}
+            batter={batter}
+            onDeck={onDeck}
+            scorecard={scorecard}
+            scheduledInnings={innings.length}
+            pitcher={
+              lineup?.P ? players.find((player) => player.id === lineup.P) : undefined
+            }
+            closed={scorecard.closed}
+            onRecord={recordPlay}
+            onUndoPlay={undoLastPlay}
+            onOpponentRun={setOpponentRuns}
+            onPitch={addPitch}
+            onCloseGame={setScoreClosed}
+          />
         )}
 
         {side === "defense" ? (
@@ -497,6 +537,8 @@ export function DugoutApp({
           onTenField={setTenField}
           inningCount={innings.length}
           onLength={setInningsLength}
+          trackPitches={scorecard.trackPitches}
+          onTrackPitches={setTrackPitches}
           onClearAssignments={clearAssignments}
           onClearPlayers={clearPlayers}
           onLoadSample={loadSample}
@@ -947,6 +989,8 @@ function GameSettings({
   onTenField,
   inningCount,
   onLength,
+  trackPitches,
+  onTrackPitches,
   onClearAssignments,
   onClearPlayers,
   onLoadSample,
@@ -957,6 +1001,8 @@ function GameSettings({
   onTenField: (ten: boolean) => void;
   inningCount: number;
   onLength: (n: number) => void;
+  trackPitches: boolean;
+  onTrackPitches: (on: boolean) => void;
   onClearAssignments: () => void;
   onClearPlayers: () => void;
   onLoadSample: () => void;
@@ -1020,6 +1066,10 @@ function GameSettings({
           </button>
         </div>
       </div>
+      <PitchSetting on={trackPitches} onToggle={onTrackPitches} />
+      <p className="mt-1 text-sm text-pretty text-muted">
+        Off for younger teams. Turn on to count pitches for whoever is on the mound this inning.
+      </p>
       <div className="mt-3 flex flex-col gap-2">
         {confirm === "new" ? (
           <button
@@ -1096,7 +1146,7 @@ function GameSettings({
       </div>
       <p className="mt-3 text-sm text-pretty text-muted">
         Everyone with this code sees the same game. New game keeps the roster and batting order,
-        clears the field and who is out, and sends the leadoff hitter up.
+        clears the field, the scorecard, and who is out, and sends the leadoff hitter up.
       </p>
     </section>
   );

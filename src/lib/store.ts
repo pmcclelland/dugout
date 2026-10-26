@@ -12,9 +12,19 @@ import {
 } from "@/lib/lineup";
 import { freshGame } from "@/lib/game-code";
 import {
+  bumpPitches,
+  cloneScorecard,
+  emptyScorecard,
+  liveScoring,
+  makePlay,
+  setOpponentInning,
+  type PlayDraft,
+} from "@/lib/scorecard";
+import {
   alignBattingOrder,
   applyAvailability,
   availablePlayers,
+  currentBatterIndex,
   emptyGame,
   MAX_INNINGS,
   nextAvailableIndex,
@@ -48,6 +58,12 @@ type State = Snapshot & {
   reorderBatting: (order: string[]) => void;
   setAtBat: (playerId: string) => void;
   advanceBatter: () => void;
+  recordPlay: (draft: PlayDraft) => void;
+  undoLastPlay: () => void;
+  setTrackPitches: (on: boolean) => void;
+  addPitch: (playerId: string, delta: number) => void;
+  setOpponentRuns: (inning: number, runs: number) => void;
+  setScoreClosed: (closed: boolean) => void;
   applyRemote: (raw: unknown) => void;
   dismissHint: () => void;
   undo: () => void;
@@ -65,6 +81,7 @@ function snapshot(s: Snapshot): Snapshot {
     battingOrder: [...s.battingOrder],
     batterIndex: s.batterIndex,
     outIds: [...s.outIds],
+    scorecard: cloneScorecard(s.scorecard),
   };
 }
 
@@ -283,6 +300,7 @@ export const useDugout = create<State>()(
             battingOrder: [],
             batterIndex: 0,
             outIds: [],
+            scorecard: emptyScorecard(s.scorecard.trackPitches),
           }),
         );
       },
@@ -327,6 +345,59 @@ export const useDugout = create<State>()(
         if (next === s.batterIndex) return;
         set(withHistory(s, { batterIndex: next }));
       },
+      recordPlay: (draft) => {
+        const s = get();
+        if (s.scorecard.closed) return;
+        const at = currentBatterIndex(s.battingOrder, s.batterIndex, s.outIds);
+        const batterId = s.battingOrder[at];
+        if (!batterId || s.outIds.includes(batterId)) return;
+        const live = liveScoring(s.scorecard.plays);
+        if (live.inning >= MAX_INNINGS) return;
+        const { play } = makePlay(live.bases, batterId, live.inning, draft, crypto.randomUUID());
+        const scorecard = cloneScorecard(s.scorecard);
+        scorecard.plays = [...scorecard.plays, play];
+        const batterIndex = nextAvailableIndex(s.battingOrder, at + 1, s.outIds);
+        set(withHistory(s, { scorecard, batterIndex }));
+      },
+      undoLastPlay: () => {
+        const s = get();
+        const last = s.scorecard.plays[s.scorecard.plays.length - 1];
+        if (!last) return;
+        const scorecard = cloneScorecard(s.scorecard);
+        scorecard.plays = scorecard.plays.slice(0, -1);
+        scorecard.closed = false;
+        const found = s.battingOrder.indexOf(last.batterId);
+        const batterIndex = found >= 0 ? found : s.batterIndex;
+        set(withHistory(s, { scorecard, batterIndex }));
+      },
+      setTrackPitches: (on) => {
+        const s = get();
+        if (s.scorecard.trackPitches === on) return;
+        const scorecard = cloneScorecard(s.scorecard);
+        scorecard.trackPitches = on;
+        set(withHistory(s, { scorecard }));
+      },
+      addPitch: (playerId, delta) => {
+        const s = get();
+        if (!s.scorecard.trackPitches || s.scorecard.closed || !playerId || delta === 0) return;
+        const scorecard = cloneScorecard(s.scorecard);
+        scorecard.pitches = bumpPitches(scorecard.pitches, playerId, delta);
+        set(withHistory(s, { scorecard }));
+      },
+      setOpponentRuns: (inning, runs) => {
+        const s = get();
+        if (s.scorecard.closed) return;
+        const scorecard = cloneScorecard(s.scorecard);
+        scorecard.opponentRuns = setOpponentInning(scorecard.opponentRuns, inning, runs);
+        set(withHistory(s, { scorecard }));
+      },
+      setScoreClosed: (closed) => {
+        const s = get();
+        if (s.scorecard.closed === closed) return;
+        const scorecard = cloneScorecard(s.scorecard);
+        scorecard.closed = closed;
+        set(withHistory(s, { scorecard }));
+      },
       applyRemote: (raw) => {
         const next = normalizeSnapshot(raw);
         set({ ...next, past: [] });
@@ -354,6 +425,7 @@ export const useDugout = create<State>()(
         battingOrder: s.battingOrder,
         batterIndex: s.batterIndex,
         outIds: s.outIds,
+        scorecard: s.scorecard,
         hint: s.hint,
       }),
       merge: (persisted, current) => {
