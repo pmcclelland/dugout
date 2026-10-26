@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Undo2 } from "lucide-react";
 import { AtBatBar, BattingCard } from "@/components/batting-card";
 import { FieldArt } from "@/components/field-art";
+import { PlayerNoteCount, PlayerNotesEditor } from "@/components/player-notes";
 import { DugoutSkeleton } from "@/components/sign-in-screen";
 import { formatCode } from "@/lib/game-code";
 import {
@@ -895,6 +896,7 @@ function RosterEditor({
                     )}
                   </div>
                 </form>
+                <PlayerNotesEditor playerId={player.id} playerName={player.name} />
               </li>
             ) : (
               <li key={player.id} className="border-t border-border">
@@ -915,6 +917,7 @@ function RosterEditor({
                     >
                       {player.name}
                     </span>
+                    <PlayerNoteCount playerId={player.id} />
                     <span className="text-sm text-muted">Edit</span>
                   </button>
                   <button
@@ -1095,8 +1098,8 @@ function GameSettings({
         ) : null}
       </div>
       <p className="mt-3 text-sm text-pretty text-muted">
-        Everyone with this code sees the same game. New game keeps the roster and batting order,
-        clears the field and who is out, and sends the leadoff hitter up.
+        Everyone with this code sees the same game. New game keeps the roster, notes, and batting
+        order, clears the field and who is out, and sends the leadoff hitter up.
       </p>
     </section>
   );

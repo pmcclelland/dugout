@@ -5,6 +5,7 @@ import {
   type Lineup,
   type Player,
 } from "./lineup.ts";
+import { emptyNotes, normalizeNotes, type PlayerNotes } from "./notes.ts";
 
 export const MAX_PLAYERS = 30;
 export const MAX_INNINGS = 12;
@@ -20,6 +21,8 @@ export type DugoutState = {
   batterIndex: number;
   /** Player ids marked out for this game only. Missing on older saves. */
   outIds: string[];
+  /** Coach bullets keyed by player id. Missing on older saves. */
+  playerNotes: PlayerNotes;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -38,6 +41,7 @@ export function emptyGame(teamName = ""): DugoutState {
     battingOrder: [],
     batterIndex: 0,
     outIds: [],
+    playerNotes: emptyNotes(),
   };
 }
 
@@ -134,6 +138,7 @@ export function normalizeSnapshot(raw: unknown): DugoutState {
     battingOrder,
     batterIndex: clampIndex(source.batterIndex, battingOrder.length),
     outIds,
+    playerNotes: normalizeNotes(source.playerNotes, ids),
   };
 }
 
