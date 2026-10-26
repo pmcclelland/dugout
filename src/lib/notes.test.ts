@@ -110,6 +110,10 @@ test("normalizeNotes treats a missing or invalid field as empty", () => {
   assert.deepEqual(normalizeNotes([], new Set(["p1"])), {});
 });
 
+test("notesFor returns a stable empty list so store selectors do not loop", () => {
+  assert.equal(notesFor({}, "p1"), notesFor({}, "p2"));
+});
+
 test("formatNoteDate shows the year only when it is not this year", () => {
   assert.equal(formatNoteDate("2026-10-26T12:00:00.000Z", NOW), "Oct 26");
   assert.equal(formatNoteDate("2025-04-03T12:00:00.000Z", NOW), "Apr 3, 2025");

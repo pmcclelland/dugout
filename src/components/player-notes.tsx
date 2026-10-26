@@ -59,7 +59,7 @@ export function PlayerNotesEditor({
       ) : (
         <ul className="mt-2">
           {newestFirst.map((note) => (
-            <li key={note.id} className="border-t border-border py-2">
+            <li key={note.id} data-player-note={note.id} className="border-t border-border py-2">
               {editingId === note.id ? (
                 <form
                   className="flex flex-col gap-2"

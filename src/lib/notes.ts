@@ -13,12 +13,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
 }
 
+const EMPTY_NOTE_LIST: PlayerNote[] = [];
+
 export function emptyNotes(): PlayerNotes {
   return {};
 }
 
 export function notesFor(notes: PlayerNotes, playerId: string): PlayerNote[] {
-  return notes[playerId] ?? [];
+  return notes[playerId] ?? EMPTY_NOTE_LIST;
 }
 
 export function cloneNotes(notes: PlayerNotes): PlayerNotes {
