@@ -74,7 +74,7 @@ export const loadGame = createServerFn({ method: "POST" })
     const key = lookupKey(data);
     const rows = await sql<{ code: string; state: unknown; revision: number }>`
       select code, state, revision from games
-      where lower(btrim(code)) = ${key}
+      where lower(btrim(code)) = lower(${key})
       limit 1
     `;
     const row = rows[0];
@@ -101,7 +101,7 @@ export const saveGame = createServerFn({ method: "POST" })
       set state = ${payload}::jsonb,
           revision = revision + 1,
           updated_at = now()
-      where lower(btrim(code)) = ${key}
+      where lower(btrim(code)) = lower(${key})
       returning revision
     `;
     const row = rows[0];

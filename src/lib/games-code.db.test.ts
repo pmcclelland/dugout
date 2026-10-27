@@ -37,7 +37,7 @@ test("games reject a second team that only differs by case", async () => {
   );
 
   const found = await pg.query<{ code: string }>(
-    "select code from games where lower(btrim(code)) = $1 limit 1",
+    "select code from games where lower(btrim(code)) = lower($1) limit 1",
     ["TIGERS"],
   );
   assert.equal(found.rows[0]?.code, "Tigers");
@@ -47,7 +47,7 @@ test("games reject a second team that only differs by case", async () => {
     state,
   ]);
   const legacy = await pg.query<{ code: string }>(
-    "select code from games where lower(btrim(code)) = $1 limit 1",
+    "select code from games where lower(btrim(code)) = lower($1) limit 1",
     ["k7m4qp"],
   );
   assert.equal(legacy.rows[0]?.code, "K7M4QP");
