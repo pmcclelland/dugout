@@ -1,8 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
-import { GAME_CODE_ALPHABET, normalizeCode } from "@/lib/game-code";
-import { newTeamFromCreateInput, normalizeSnapshot, type DugoutState } from "@/lib/snapshot";
+import {
+  CODE_TAKEN_MESSAGE,
+  codeLookupKey,
+  isUniqueViolation,
+  normalizeCode,
+  parseCreateGameInput,
+} from "@/lib/game-code";
+import { normalizeSnapshot, type DugoutState } from "@/lib/snapshot";
 
 export type GameRecord = {
+  code: string;
   state: DugoutState;
   revision: number;
 };
@@ -34,31 +41,29 @@ function requireCode(input: unknown): string {
   return code;
 }
 
-function newCode(): string {
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
-  let code = "";
-  for (const byte of bytes) code += GAME_CODE_ALPHABET[byte % GAME_CODE_ALPHABET.length];
-  return code;
+function lookupKey(code: string): string {
+  return codeLookupKey(code) ?? code.toLowerCase();
 }
 
 export const createGame = createServerFn({ method: "POST" })
-  .validator((input: unknown): DugoutState => newTeamFromCreateInput(input))
+  .validator((input: unknown) => parseCreateGameInput(input))
   .handler(async ({ data }) => {
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
-    const payload = JSON.stringify(data);
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const code = newCode();
+    const payload = JSON.stringify(data.state);
+    try {
       const rows = await sql<{ code: string }>`
         insert into games (code, state, revision)
-        values (${code}, ${payload}::jsonb, 1)
-        on conflict (code) do nothing
+        values (${data.code}, ${payload}::jsonb, 1)
         returning code
       `;
-      if (rows[0]) return { code, revision: 1 };
+      const code = rows[0]?.code;
+      if (!code) throw new Error("Could not start a game");
+      return { code, revision: 1 };
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new Error(CODE_TAKEN_MESSAGE);
+      throw error;
     }
-    throw new Error("Could not start a game");
   });
 
 export const loadGame = createServerFn({ method: "POST" })
@@ -66,12 +71,19 @@ export const loadGame = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<GameRecord | null> => {
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
-    const rows = await sql<{ state: unknown; revision: number }>`
-      select state, revision from games where code = ${data} limit 1
+    const key = lookupKey(data);
+    const rows = await sql<{ code: string; state: unknown; revision: number }>`
+      select code, state, revision from games
+      where lower(btrim(code)) = lower(${key})
+      limit 1
     `;
     const row = rows[0];
     if (!row) return null;
-    return { state: normalizeSnapshot(parseState(row.state)), revision: Number(row.revision) };
+    return {
+      code: row.code,
+      state: normalizeSnapshot(parseState(row.state)),
+      revision: Number(row.revision),
+    };
   });
 
 export const saveGame = createServerFn({ method: "POST" })
@@ -83,12 +95,13 @@ export const saveGame = createServerFn({ method: "POST" })
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
     const payload = JSON.stringify(data.state);
+    const key = lookupKey(data.code);
     const rows = await sql<{ revision: number }>`
       update games
       set state = ${payload}::jsonb,
           revision = revision + 1,
           updated_at = now()
-      where code = ${data.code}
+      where lower(btrim(code)) = lower(${key})
       returning revision
     `;
     const row = rows[0];

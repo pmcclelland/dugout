@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { FieldArt } from "@/components/field-art";
 import { createGame, loadGame } from "@/lib/dugout.functions";
-import { formatCode, normalizeCode } from "@/lib/game-code";
+import {
+  CODE_TAKEN_MESSAGE,
+  formatCode,
+  isCodeTakenError,
+  normalizeCode,
+} from "@/lib/game-code";
 
 export function GameCodeScreen({
   notice,
@@ -12,21 +17,27 @@ export function GameCodeScreen({
 }) {
   const [entry, setEntry] = useState("");
   const [teamName, setTeamName] = useState("");
+  const [teamCode, setTeamCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"start" | "join" | null>(null);
   const name = teamName.trim().slice(0, 40);
+  const chosen = normalizeCode(teamCode);
 
-  async function start() {
-    if (!name) return;
+  async function start(event: React.FormEvent) {
+    event.preventDefault();
+    if (!name || !chosen) return;
     setBusy("start");
     setError(null);
+    setCodeError(null);
     try {
       const created = await createGame({
-        data: { teamName: name },
+        data: { teamName: name, code: chosen },
       });
       onOpen(created.code);
-    } catch {
-      setError("Could not start a game. Try again.");
+    } catch (cause) {
+      if (isCodeTakenError(cause)) setCodeError(CODE_TAKEN_MESSAGE);
+      else setError("Could not start a game. Try again.");
       setBusy(null);
     }
   }
@@ -35,21 +46,22 @@ export function GameCodeScreen({
     event.preventDefault();
     const code = normalizeCode(entry);
     if (!code) {
-      setError("Enter the 6-character code, like K7M-4QP.");
+      setError("Enter a team code.");
       return;
     }
     setBusy("join");
     setError(null);
+    setCodeError(null);
     try {
       const remote = await loadGame({ data: { code } });
       if (!remote) {
-        setError("No game with that code.");
+        setError("No team with that code.");
         setBusy(null);
         return;
       }
-      onOpen(code);
+      onOpen(remote.code);
     } catch {
-      setError("Could not open that game. Try again.");
+      setError("Could not open that team. Try again.");
       setBusy(null);
     }
   }
@@ -65,40 +77,68 @@ export function GameCodeScreen({
         <p className="font-display text-sm tracking-widest text-muted">DUGOUT</p>
         <h1 className="font-display text-5xl leading-none">Name the team</h1>
         <p className="mt-3 text-pretty text-muted">
-          Then start a game and share the code. Any coach who joins sees the same lineup.
+          Pick a code you can remember, then start. Any coach who joins with it sees the same
+          lineup.
         </p>
         {notice ? <p className="mt-3 text-sm text-warn">{notice}</p> : null}
         {error ? <p className="mt-3 text-sm text-warn">{error}</p> : null}
-        <label className="mt-6 block">
-          <span className="font-display text-sm tracking-widest text-muted">TEAM NAME</span>
-          <input
-            aria-label="Team name"
-            value={teamName}
-            maxLength={40}
-            placeholder="Mudcats"
-            onChange={(event) => setTeamName(event.target.value)}
-            className="input mt-1 w-full font-display text-3xl"
-          />
-        </label>
-        <button
-          type="button"
-          className="btn btn-primary mt-3 h-12 w-full"
-          disabled={busy !== null || !name}
-          onClick={() => void start()}
-        >
-          {busy === "start" ? "Starting…" : "Start a game"}
-        </button>
+        <form onSubmit={(event) => void start(event)}>
+          <label className="mt-6 block">
+            <span className="font-display text-sm tracking-widest text-muted">TEAM NAME</span>
+            <input
+              aria-label="Team name"
+              value={teamName}
+              maxLength={40}
+              placeholder="Mudcats"
+              onChange={(event) => setTeamName(event.target.value)}
+              className="input mt-1 w-full font-display text-3xl"
+            />
+          </label>
+          <label className="mt-4 block">
+            <span className="font-display text-sm tracking-widest text-muted">TEAM CODE</span>
+            <input
+              aria-label="Team code"
+              aria-invalid={Boolean(codeError)}
+              aria-describedby={codeError ? "team-code-error" : undefined}
+              value={teamCode}
+              maxLength={40}
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="Tigers"
+              onChange={(event) => {
+                setTeamCode(event.target.value);
+                if (codeError) setCodeError(null);
+              }}
+              className="input mt-1 w-full font-display text-3xl"
+            />
+          </label>
+          {codeError ? (
+            <p id="team-code-error" className="mt-2 text-sm text-warn">
+              {codeError}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Codes are matched without worrying about caps.</p>
+          )}
+          <button
+            type="submit"
+            className="btn btn-primary mt-3 h-12 w-full"
+            disabled={busy !== null || !name || !chosen}
+          >
+            {busy === "start" ? "Starting…" : "Start a game"}
+          </button>
+        </form>
         <form className="mt-3 flex gap-2" onSubmit={(event) => void join(event)}>
           <input
-            aria-label="Game code"
+            aria-label="Join team code"
             value={entry}
-            autoCapitalize="characters"
+            autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="K7M-4QP"
-            maxLength={8}
-            onChange={(event) => setEntry(event.target.value.toUpperCase())}
-            className="input min-w-0 flex-1 font-display text-2xl tracking-wide uppercase"
+            placeholder="Tigers"
+            maxLength={40}
+            onChange={(event) => setEntry(event.target.value)}
+            className="input min-w-0 flex-1 font-display text-2xl tracking-wide"
           />
           <button
             type="submit"
@@ -111,7 +151,7 @@ export function GameCodeScreen({
         {known ? (
           <p className="mt-2 text-sm text-muted">Joining {formatCode(known)}</p>
         ) : (
-          <p className="mt-2 text-sm text-muted">Or join a game another coach already started.</p>
+          <p className="mt-2 text-sm text-muted">Or join with a code another coach already picked.</p>
         )}
       </div>
     </main>
