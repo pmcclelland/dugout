@@ -12,6 +12,14 @@ import {
 } from "@/lib/lineup";
 import { freshGame } from "@/lib/game-code";
 import {
+  addPlayerNote,
+  cloneNotes,
+  dropPlayerNotes,
+  emptyNotes,
+  removePlayerNote,
+  updatePlayerNote,
+} from "@/lib/notes";
+import {
   alignBattingOrder,
   applyAvailability,
   availablePlayers,
@@ -45,6 +53,9 @@ type State = Snapshot & {
   startNewGame: () => void;
   loadSample: () => void;
   setOut: (playerId: string, out: boolean) => void;
+  addNote: (playerId: string, text: string) => void;
+  updateNote: (playerId: string, noteId: string, text: string) => void;
+  removeNote: (playerId: string, noteId: string) => void;
   reorderBatting: (order: string[]) => void;
   setAtBat: (playerId: string) => void;
   advanceBatter: () => void;
@@ -65,6 +76,7 @@ function snapshot(s: Snapshot): Snapshot {
     battingOrder: [...s.battingOrder],
     batterIndex: s.batterIndex,
     outIds: [...s.outIds],
+    playerNotes: cloneNotes(s.playerNotes),
   };
 }
 
@@ -183,6 +195,7 @@ export const useDugout = create<State>()(
             battingOrder,
             batterIndex,
             outIds: s.outIds.filter((pid) => pid !== id),
+            playerNotes: dropPlayerNotes(s.playerNotes, id),
           }),
         );
       },
@@ -283,6 +296,7 @@ export const useDugout = create<State>()(
             battingOrder: [],
             batterIndex: 0,
             outIds: [],
+            playerNotes: emptyNotes(),
           }),
         );
       },
@@ -298,9 +312,28 @@ export const useDugout = create<State>()(
         }
         set(withHistory(s, next));
       },
+      addNote: (playerId, text) => {
+        const s = get();
+        if (!s.players.some((player) => player.id === playerId)) return;
+        const playerNotes = addPlayerNote(s.playerNotes, playerId, text);
+        if (!playerNotes) return;
+        set(withHistory(s, { playerNotes }));
+      },
+      updateNote: (playerId, noteId, text) => {
+        const s = get();
+        const playerNotes = updatePlayerNote(s.playerNotes, playerId, noteId, text);
+        if (!playerNotes) return;
+        set(withHistory(s, { playerNotes }));
+      },
+      removeNote: (playerId, noteId) => {
+        const s = get();
+        const playerNotes = removePlayerNote(s.playerNotes, playerId, noteId);
+        if (!playerNotes) return;
+        set(withHistory(s, { playerNotes }));
+      },
       loadSample: () => {
         const s = get();
-        set({ ...withHistory(s, sampleGame()), hint: s.hint });
+        set({ ...withHistory(s, { ...sampleGame(), playerNotes: emptyNotes() }), hint: s.hint });
       },
       reorderBatting: (order) => {
         const s = get();
@@ -354,6 +387,7 @@ export const useDugout = create<State>()(
         battingOrder: s.battingOrder,
         batterIndex: s.batterIndex,
         outIds: s.outIds,
+        playerNotes: s.playerNotes,
         hint: s.hint,
       }),
       merge: (persisted, current) => {

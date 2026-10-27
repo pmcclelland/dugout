@@ -15,6 +15,7 @@ function pick(state: DugoutState): DugoutState {
     battingOrder: state.battingOrder,
     batterIndex: state.batterIndex,
     outIds: state.outIds,
+    playerNotes: state.playerNotes,
   };
 }
 

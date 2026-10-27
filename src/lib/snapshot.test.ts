@@ -22,6 +22,7 @@ function assertCleanSlate(state: ReturnType<typeof emptyGame>, teamName: string)
   assert.equal(state.inningIndex, 0);
   assert.equal(state.tenField, false);
   assert.deepEqual(state.outIds, []);
+  assert.deepEqual(state.playerNotes, {});
   assert.equal(state.innings.length, DEFAULT_INNINGS);
   for (const inning of state.innings) {
     for (const pos of ALL_POSITION_IDS) {
@@ -75,7 +76,22 @@ test("normalizeSnapshot treats missing outIds as everyone available", () => {
     battingOrder: ["p1"],
   });
   assert.deepEqual(next.outIds, []);
+  assert.deepEqual(next.playerNotes, {});
   assert.equal(next.players[0]?.name, "Ada");
+});
+
+test("normalizeSnapshot keeps notes for rostered players and drops the rest", () => {
+  const next = normalizeSnapshot({
+    teamName: "Hawks",
+    players: [{ id: "p1", name: "Ada", number: "4", fromInning: 0 }],
+    playerNotes: {
+      p1: [{ id: "n1", text: "  Glove down  ", createdAt: "2026-10-26T12:00:00.000Z" }],
+      ghost: [{ id: "n9", text: "gone", createdAt: "2026-10-26T12:00:00.000Z" }],
+    },
+  });
+  assert.deepEqual(next.playerNotes, {
+    p1: [{ id: "n1", text: "Glove down", createdAt: "2026-10-26T12:00:00.000Z" }],
+  });
 });
 
 test("normalizeSnapshot drops unknown out ids and pulls out players off the field", () => {
