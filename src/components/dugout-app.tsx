@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Undo2 } from "lucide-react";
 import { AtBatBar, BattingCard } from "@/components/batting-card";
 import { FieldArt } from "@/components/field-art";
-import { PlayerNoteCount, PlayerNotesEditor } from "@/components/player-notes";
+import { PlayerNotesCard } from "@/components/player-notes";
 import { DugoutSkeleton } from "@/components/sign-in-screen";
 import { formatCode } from "@/lib/game-code";
 import {
@@ -493,6 +493,7 @@ export function DugoutApp({
             if (out && selected === id) setSelected(null);
           }}
         />
+        <PlayerNotesCard players={players} />
         <GameSettings
           tenField={tenField}
           onTenField={setTenField}
@@ -896,7 +897,6 @@ function RosterEditor({
                     )}
                   </div>
                 </form>
-                <PlayerNotesEditor playerId={player.id} playerName={player.name} />
               </li>
             ) : (
               <li key={player.id} className="border-t border-border">
@@ -917,7 +917,6 @@ function RosterEditor({
                     >
                       {player.name}
                     </span>
-                    <PlayerNoteCount playerId={player.id} />
                     <span className="text-sm text-muted">Edit</span>
                   </button>
                   <button
