@@ -1,4 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatNoteDate, MAX_NOTE_LENGTH, notesFor, type PlayerNotes } from "@/lib/notes";
 import type { Player } from "@/lib/lineup";
 import { useDugout } from "@/lib/store";
@@ -139,7 +146,7 @@ function PlayerNotesPanel({ playerId, playerName }: { playerId: string; playerNa
 export function PlayerNotesCard({ players }: { players: Player[] }) {
   const playerNotes = useDugout((s) => s.playerNotes);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [pickId, setPickId] = useState("");
+  const [pickerKey, setPickerKey] = useState(0);
 
   const noted = playersWithNotes(players, playerNotes);
   const withoutNotes = [...players]
@@ -156,13 +163,6 @@ export function PlayerNotesCard({ players }: { players: Player[] }) {
 
   function toggle(id: string) {
     setOpenId((current) => (current === id ? null : id));
-  }
-
-  function startForPlayer(event: FormEvent) {
-    event.preventDefault();
-    if (!pickId) return;
-    setOpenId(pickId);
-    setPickId("");
   }
 
   return (
@@ -206,31 +206,26 @@ export function PlayerNotesCard({ players }: { players: Player[] }) {
       )}
 
       {withoutNotes.length > 0 ? (
-        <form
-          className="mt-3 flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center"
-          onSubmit={startForPlayer}
-        >
-          <label className="sr-only" htmlFor="notes-player-pick">
-            Player to add notes for
-          </label>
-          <select
-            id="notes-player-pick"
-            aria-label="Player to add notes for"
-            value={pickId}
-            onChange={(event) => setPickId(event.target.value)}
-            className="input min-w-0 flex-1"
+        <div className="mt-3 border-t border-border pt-3">
+          <Select
+            key={pickerKey}
+            onValueChange={(id) => {
+              setOpenId(id);
+              setPickerKey((n) => n + 1);
+            }}
           >
-            <option value="">Add notes for…</option>
-            {withoutNotes.map((player) => (
-              <option key={player.id} value={player.id}>
-                {player.number ? `${player.number} ${player.name}` : player.name}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="btn h-11 shrink-0 px-3" disabled={!pickId}>
-            Open
-          </button>
-        </form>
+            <SelectTrigger aria-label="Player to add notes for" className="w-full">
+              <SelectValue placeholder="Add notes for…" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              {withoutNotes.map((player) => (
+                <SelectItem key={player.id} value={player.id}>
+                  {player.number ? `${player.number} ${player.name}` : player.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       ) : null}
     </section>
   );
