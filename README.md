@@ -1,6 +1,6 @@
 # Dugout
 
-Lineup board for youth baseball and softball. Name the team, start a game, and share a six-character code. Every coach who joins sees the same roster, defense, and batting order.
+Lineup board for youth baseball and softball. Name the team, pick a code you can remember, and start a game. Every coach who joins with that code sees the same roster, defense, and batting order.
 
 ![Dugout lineup board](public/og.jpg)
 

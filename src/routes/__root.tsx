@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Little league dugout. Share a game code, set the defense, and run the batting order.",
+          "Little league dugout. Pick a team code, set the defense, and run the batting order.",
       },
       { name: "theme-color", content: "#f3efe6" },
     ],
